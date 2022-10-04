@@ -1,38 +1,45 @@
 <template>
   <div class="box">
     <div class="bj" ref="vantaRef"></div>
-
-
-
-
-
-
     <div class="container">
       <div class="welcome">
         <div class="pinkbox">
           <!-- 注册 -->
           <div class="signup nodisplay">
             <h1>Register</h1>
-            <form autocomplete="off">
-              <input type="text" placeholder="Username">
-              <input type="email" placeholder="Email">
-              <input type="password" placeholder="Password">
-              <input type="password" placeholder="Confirm Password">
-              <button class="button submit">Create Account</button>
-            </form>
+            <el-form class="elform" ref="rgsRef" :rules="registerRules" :model="registerForm" autocomplete="off">
+              <el-form-item prop="username">
+                <el-input type="text" maxlength="18" v-model="registerForm.username" clearable placeholder="Username"/>
+              </el-form-item>
+              <el-form-item prop="email">
+                <el-input type="email" maxlength="20"   v-model="registerForm.email" clearable placeholder="Email"/>
+              </el-form-item>
+              <el-form-item prop="password">
+                <el-input type="password" maxlength="18"   v-model="registerForm.password" show-password clearable placeholder="Password"/>
+              </el-form-item>
+              <el-form-item prop="password2">
+                <el-input type="password" maxlength="18"   v-model="registerForm.password2" show-password clearable placeholder="Confirm Password"/>
+              </el-form-item>
+              <button class="button submit" @click.prevent="register">Create Account</button>
+            </el-form>
           </div>
 
           <!-- 登录 -->
           <div class="signin">
             <h1>Sign In</h1>
-            <form class="more-padding" autocomplete="off">
-              <input type="text" placeholder="Username">
-              <input type="password" placeholder="Password">
+            <el-form class="more-padding elform" :rules="loginRules"  ref="loginRef" :model="loginForm" autocomplete="off">
+              <el-form-item prop="username">
+               <el-input type="text" maxlength="18" ref="UserNameRef"   v-model="loginForm.username" clearable  placeholder="Username"/>
+              </el-form-item>
+              <el-form-item prop="password">
+               <el-input type="password" maxlength="18" ref="PasswordRef"   v-model="loginForm.password" show-password clearable placeholder="Password"/>
+              </el-form-item>
               <div class="checkbox">
-                <input type="checkbox" id="remember" /><label for="remember">Remember Me</label>
+<!--                <el-input type="checkbox" id="remember" /><label for="remember">Remember Me</label>-->
+                <el-checkbox v-model="loginForm.rememberMe">Remember Me</el-checkbox>
               </div>
-              <button class="buttom sumbit">Login</button>
-            </form>
+              <button class="buttom sumbit" @click.prevent="login">Login</button>
+            </el-form>
           </div>
         </div>
 
@@ -41,7 +48,7 @@
           <p class="desc">Belongs to Yang brother's  <span>blog</span></p>
           <img class="flower smaller" src="@/assets/login/flower.png" />
           <p class="account">Have an account?</p>
-          <button class="button" id="signin" @click="signinClick">Login</button>
+          <button class="button signinDom"  id="signin" @click="signinClick">Login</button>
         </div>
 
         <div class="rightbox">
@@ -60,10 +67,27 @@ import * as THREE from 'three'
 // import BIRDS from 'vanta/src/vanta.birds'
 import CLOUDS from 'vanta/src/vanta.clouds'
 import $ from 'jquery'
+import {login,register} from '@/api/login'
+import {registerRules,loginRules} from './config'
+import { setAccount, getAccount } from "@/utils/auth";
 export  default  {
   name:'login',
   data(){
     return{
+      registerForm:{
+        username:'',
+        password: '',
+        password2:'',
+        email:''
+      },
+      loginForm:{
+        username:'',
+        password: '',
+        rememberMe:false
+      },
+      loading: false,
+      registerRules:registerRules.call(this),
+      loginRules:loginRules()
     }
   },
   methods:{
@@ -78,6 +102,82 @@ export  default  {
         $('.signup').addClass('nodisplay');
         $('.signin').removeClass('nodisplay');
       });
+    },
+    /**
+     * 是否保存账户信息
+     */
+    saveAccount() {
+      const saveInfo = {};
+      const { username, rememberMe } = this.loginForm;
+      // 账户信息
+      saveInfo.username = username;
+      // 保存密码
+      if (rememberMe) {
+        saveInfo.rememberMe = rememberMe;
+        saveInfo.password = this.loginForm.password;
+      }
+      // 保存用户信息
+      setAccount(saveInfo);
+    },
+    /**
+     * 获取用户信息
+     */
+    getAccount() {
+      const defaultInfo = getAccount();
+      // 默认账号信息
+      this.loginForm = {
+        ...this.loginForm,
+        ...defaultInfo
+      };
+      if (this.loginForm.username) {
+        this.$refs["PasswordRef"].focus();
+      } else {
+        this.$refs["UserNameRef"].focus();
+      }
+    },
+    register(){
+      this.$refs.rgsRef.validate(vaild=>{
+        if(!vaild) return
+        if(this.loading)return
+        this.loading=true
+        const params={
+          ...this.registerForm
+        }
+        register(params).then(({code})=>{
+          if(code===200){
+            this.$message.success('注册成功！')
+            this.$refs.rgsRef.resetFields();
+            this.$refs.rgsRef.clearValidate();
+            $('.pinkbox').css('transform', 'translateX(0%)');
+            $('.signup').addClass('nodisplay');
+            $('.signin').removeClass('nodisplay');
+          }
+        }).finally(()=>{
+          this.loading=false
+        })
+      })
+    },
+    login(){
+      this.$refs.loginRef.validate(vaild=> {
+        if(!vaild)return
+        if(this.loading)return
+        this.loading=true
+        const params={
+          ...this.loginForm
+        }
+        login(params).then(({code,data})=>{
+            if(code===200){
+              // 是否保存账号
+              this.saveAccount();
+              localStorage.setItem('userInfo',JSON.stringify(data))
+              this.$message.success('登录成功！')
+            }
+        }).finally(()=>{
+          this.loading=false
+        })
+      })
+
+
     }
   },
   mounted() {
@@ -85,6 +185,10 @@ export  default  {
       el:this.$refs.vantaRef,
       THREE:THREE
     })
+    // 获取默认账号信息
+    this.$nextTick().then(() => {
+      this.getAccount();
+    });
   },
   beforeDestroy() {
     if(this.vantaEffect){
@@ -95,11 +199,73 @@ export  default  {
 </script>
 <style lang="scss" scoped>
 @import url("https://fonts.googleapis.com/css?family=Open+Sans:300,400|Lora");
-
+button:hover{
+  cursor: pointer;
+}
  .box{
    width: 100%;
    height: 100%;
    display: flex;
+   .elform /deep/ {
+     .el-form-item{
+       margin-bottom: 40px;
+     }
+     .el-input{
+       .el-input__clear{
+         color: aliceblue;
+       }
+     }
+     .el-input__inner {
+       background: #eac7cc;
+       width: 100%;
+       color: #ce7d88;
+       border: none;
+       border-bottom: 1px solid rgba(246, 246, 246, 0.5);
+       padding: 9px;
+       font-weight: 100;
+       &::placeholder{
+         color: #f6f6f6;
+         letter-spacing: 2px;
+         font-size: 1.0em;
+         font-weight: 100;
+       }
+       &:focus{
+         color: #ce7d88;
+         outline: none;
+         border-bottom: 1.2px solid rgba(206, 125, 136, 0.7);
+         font-size: 1.0em;
+         transition: 0.8s all ease;
+         &::placeholder{
+           opacity: 0;
+         }
+       }
+     }
+   }
+
+   label {
+     font-family: "Open Sans", sans-serif;
+     color: #ce7d88;
+     font-size: 0.8em;
+     letter-spacing: 1px;
+   }
+
+   .checkbox {
+     display: inline;
+     white-space: nowrap;
+     position: relative;
+     left: -25px;
+     top: 0px;
+   }
+
+   input[type=checkbox] {
+     width: 15px;
+     background: #ce7d88;
+   }
+
+   .checkbox input[type=checkbox]:checked + label {
+     color: #ce7d88;
+     transition: 0.5s all ease;
+   }
    .bj{
      width: 100%;
      height: 100%;
@@ -112,6 +278,7 @@ export  default  {
      left: 36%;
      top: 17%;
    }
+
 
    .welcome {
      background: #f6f6f6;
@@ -159,7 +326,7 @@ export  default  {
    h1 {
      font-family: "Open Sans", sans-serif;
      text-align: center;
-     margin-top: 95px;
+     margin-top: 45px;
      text-transform: uppercase;
      color: #f6f6f6;
      font-size: 2em;
@@ -271,7 +438,7 @@ export  default  {
      border-color: #bfb1c9;
    }
 
-   input {
+   /*input {
      background: #eac7cc;
      width: 65%;
      color: #ce7d88;
@@ -280,50 +447,8 @@ export  default  {
      padding: 9px;
      font-weight: 100;
    }
+*/
 
-   input::placeholder {
-     color: #f6f6f6;
-     letter-spacing: 2px;
-     font-size: 1.0em;
-     font-weight: 100;
-   }
-
-   input:focus {
-     color: #ce7d88;
-     outline: none;
-     border-bottom: 1.2px solid rgba(206, 125, 136, 0.7);
-     font-size: 1.0em;
-     transition: 0.8s all ease;
-   }
-
-   input:focus::placeholder {
-     opacity: 0;
-   }
-
-   label {
-     font-family: "Open Sans", sans-serif;
-     color: #ce7d88;
-     font-size: 0.8em;
-     letter-spacing: 1px;
-   }
-
-   .checkbox {
-     display: inline;
-     white-space: nowrap;
-     position: relative;
-     left: -52px;
-     top: 25px;
-   }
-
-   input[type=checkbox] {
-     width: 15px;
-     background: #ce7d88;
-   }
-
-   .checkbox input[type=checkbox]:checked + label {
-     color: #ce7d88;
-     transition: 0.5s all ease;
-   }
  }
 
 </style>
